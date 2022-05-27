@@ -7,7 +7,7 @@ use chrono::{
 };
 use thiserror::Error;
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone)]
 pub enum IcedFormValueError {
     #[error("Deserializing value of type [{type_name}] - {message}")]
     Deserializing {
@@ -19,16 +19,15 @@ pub enum IcedFormValueError {
 pub type IcedFormValueResult<T> = Result<T, IcedFormValueError>;
 
 pub trait IcedFormValue: Sized {
-    type Message;
     fn serialize(&self) -> String;
     fn deserialize(val: &str) -> IcedFormValueResult<Self>;
 }
 
 static DATE_TIME_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
-pub struct Updated<T>(T);
+// #[derive(Clone, Debug)]
+// pub struct IcedFormValueResult<T>(pub T);
 
 impl IcedFormValue for NaiveDateTime {
-    type Message = Updated<Self>;
     fn serialize(&self) -> String {
         NaiveDateTime::format(self, DATE_TIME_FORMAT).to_string()
     }
@@ -43,8 +42,17 @@ impl IcedFormValue for NaiveDateTime {
     }
 }
 
+impl IcedFormValue for String {
+    fn serialize(&self) -> String {
+        self.clone()
+    }
+
+    fn deserialize(val: &str) -> IcedFormValueResult<Self> {
+        Ok(val.to_string())
+    }
+}
+
 impl IcedFormValue for uuid::Uuid {
-    type Message = Updated<Self>;
     fn serialize(&self) -> String {
         self.to_string()
     }
@@ -57,57 +65,59 @@ impl IcedFormValue for uuid::Uuid {
     }
 }
 
-impl IcedFormValue for String {
-    type Message = Updated<Self>;
-    fn serialize(&self) -> String {
-        self.clone()
-    }
+impl_iced_form!(NaiveDateTime);
+impl_iced_form!(String);
+impl_iced_form!(uuid::Uuid);
 
-    fn deserialize(val: &str) -> IcedFormValueResult<Self> {
-        Ok(val.to_owned())
-    }
-}
-
-pub trait IcedForm<'a, T>
-where
-    Self::Message: Clone,
-{
-    type Message;
+pub trait IcedForm<'a>: Sized + Clone {
     fn view(
         &self,
         name: &'static str,
-        value: &T,
-        on_change: impl Fn(T) -> Self::Message + 'a,
-        on_error: impl Fn(IcedFormValueError) -> Self::Message + 'a,
-    ) -> iced::pure::widget::Container<'a, Self::Message>;
+        on_change: impl Fn(IcedFormValueResult<Self>) -> IcedFormValueResult<Self> + 'a,
+    ) -> iced::pure::widget::Container<'a, IcedFormValueResult<Self>>;
 }
 use iced::pure::{
     container,
     text_input,
 };
-impl<'a, T> IcedForm<'a, T> for T
-where
-    T: IcedFormValue,
-    Self::Message: Clone,
-{
-    type Message = T::Message;
-    fn view(
-        &self,
-        name: &'static str,
-        value: &T,
-        on_change: impl Fn(T) -> Self::Message + 'a,
-        on_error: impl Fn(IcedFormValueError) -> Self::Message + 'a,
-    ) -> iced::pure::widget::Container<'a, Self::Message> {
-        container::<'a>(text_input(
-            name,
-            &value.serialize(),
-            move |val: String| match T::deserialize(&val) {
-                Ok(v) => on_change(v),
-                Err(e) => on_error(e),
-            },
-        ))
-    }
+#[macro_export]
+macro_rules! impl_iced_form {
+    ($ty:ty) => {
+        impl<'a> IcedForm<'a> for $ty {
+            fn view(
+                &self,
+                name: &'static str,
+                on_change: impl Fn(IcedFormValueResult<Self>) -> IcedFormValueResult<Self> + 'a,
+            ) -> iced::pure::widget::Container<'a, IcedFormValueResult<Self>> {
+                container::<'a>(text_input(name, &self.serialize(), move |val: String| {
+                    on_change(<$ty>::deserialize(&val))
+                }))
+            }
+        }
+    };
 }
+// impl<'a, T> IcedForm<'a, T> for T // no idea how to get this to work for now
+// where
+//     T: IcedFormValue,
+// {
+//     type Message = T::Message;
+//     fn view(
+//         &self,
+//         name: &'static str,
+//         value: &T,
+//         on_change: impl Fn(T) -> Self::Message + 'a,
+//         on_error: impl Fn(IcedFormValueError) -> Self::Message + 'a,
+//     ) -> iced::pure::widget::Container<'a, Self::Message> {
+//         container::<'a>(text_input(
+//             name,
+//             &value.serialize(),
+//             move |val: String| match T::deserialize(&val) {
+//                 Ok(v) => on_change(v),
+//                 Err(e) => on_error(e),
+//             },
+//         ))
+//     }
+// }
 
 #[cfg(test)]
 mod tests {

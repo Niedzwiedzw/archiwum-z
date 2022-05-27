@@ -6,3 +6,6 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+iced = { version = "0.4.2", features = ["tokio", "pure"] }
+iced_forms = {path = "../iced_forms"}
+iced_forms_derive = {path = "../iced_forms_derive"}

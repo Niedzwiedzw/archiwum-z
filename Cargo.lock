@@ -939,6 +939,11 @@ dependencies = [
 [[package]]
 name = "iced_forms_test"
 version = "0.1.0"
+dependencies = [
+ "iced",
+ "iced_forms",
+ "iced_forms_derive",
+]
 
 [[package]]
 name = "iced_futures"
