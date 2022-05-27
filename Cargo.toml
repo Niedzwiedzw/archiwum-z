@@ -23,6 +23,7 @@ iced = { version = "0.4.2", features = ["tokio", "pure"] }
 itertools = "0.10.3"
 rust_decimal = { version = "1.23.1" }
 serde = { version = "1.0.137", features = ["derive"] }
+serde_json = { version = "1.0.81", features = ["preserve_order"] }
 thiserror = "1.0.31"
 tokio = { version = "1.18.2", features = ["full", "tracing"] }
 tokio-stream = { version = "0.1.8", features = ["fs"] }
@@ -31,4 +32,4 @@ tracing = { version = "0.1.34", features = ["log"] }
 tracing-appender = { version = "0.2.2", features = ["parking_lot"] }
 tracing-subscriber = { version = "0.3.11", features = ["tracing", "env-filter", "local-time"] }
 uuid = { version = "1.0.0", features = ["serde", "v4"] }
-
+iced_forms = {path = "./iced_forms"}

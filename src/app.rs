@@ -28,6 +28,7 @@ use iced::{
     Command,
     Length,
 };
+use iced_forms::IcedFormValueResult;
 use tracing::error;
 
 use crate::{
@@ -41,7 +42,10 @@ use super::*;
 pub enum Mode {
     Index,
     ViewingEntries,
-    CreateNewRepairContract { form: RepairContract },
+    CreateNewRepairContract {
+        form: RepairContract,
+        buffer: IcedFormValueResult<serde_json::Value>,
+    },
 }
 pub struct ArchiwumZ {
     pub db: crate::db::Database,
@@ -50,19 +54,23 @@ pub struct ArchiwumZ {
 }
 
 mod local_messages {
+    use serde_json::Value;
+
     use super::*;
     #[derive(Debug, Clone)]
     pub enum CreateRepairContract {
-        FormUpdated(RepairContract),
+        FormUpdated(IcedFormValueResult<Value>),
     }
 }
+
+use local_messages::*;
 
 #[derive(Debug, Clone)]
 pub enum Message {
     SwitchMode(Mode),
     RefreshRepairContracts,
     RepairContractsRefreshed(Arc<Result<Vec<RepairContractEntry>>>),
-    CreateRepairContract(local_messages::CreateRepairContract),
+    CreateRepairContract(CreateRepairContract),
 }
 
 mod custom_widgets {
@@ -75,6 +83,12 @@ mod custom_widgets {
 }
 
 mod pages {
+
+    use iced::pure::text;
+    use iced_forms::{
+        IcedForm,
+        IcedFormValueResult,
+    };
 
     use crate::db::FillForm;
 
@@ -89,19 +103,29 @@ mod pages {
     pub fn create_new_contract_form<'a>(
         repair_contract_entries: &'a [RepairContractEntry],
         form: &'a RepairContract,
+        buffer: &'a IcedFormValueResult<serde_json::Value>,
     ) -> Column<'a, Message> {
-        let with_title = |text: &'static str, element| {
-            Row::new()
-                .spacing(30)
-                .align_items(Alignment::Start)
-                .push(Text::new(text).width(Length::Units(100)))
-                .push(Text::new(form.id.to_string()))
+        // let with_title = |text: &'static str, element| {
+        //     Row::new()
+        //         .spacing(30)
+        //         .align_items(Alignment::Start)
+        //         .push(Text::new(text).width(Length::Units(100)))
+        //         .push(element)
+        // };
+        let form: Element<'a, _> = match buffer {
+            Ok(form) => form
+                .view(
+                    move |v| Message::CreateRepairContract(CreateRepairContract::FormUpdated(v)),
+                    Default::default(),
+                )
+                .into(),
+            Err(e) => text(e.to_string()).into(),
         };
         Column::new()
             .max_width(800)
             .spacing(20)
             .align_items(Alignment::Center)
-            .push(with_title("id", Text::new(form.id.to_string())))
+            .push(form)
     }
 
     pub fn contracts_list(
@@ -161,7 +185,13 @@ impl Application for ArchiwumZ {
                 Err(e) => error!("{e:#?}"),
             },
             Message::CreateRepairContract(message) => match message {
-                local_messages::CreateRepairContract::FormUpdated(_) => todo!(),
+                local_messages::CreateRepairContract::FormUpdated(updated) => {
+                    match &mut self.mode {
+                        Mode::Index => todo!(),
+                        Mode::ViewingEntries => todo!(),
+                        Mode::CreateNewRepairContract { form, buffer } => *buffer = updated,
+                    }
+                }
             },
         }
         Command::none()
@@ -177,11 +207,13 @@ impl Application for ArchiwumZ {
         let navigation = Row::new()
             .push(iced::pure::button("Archiwum Z").on_press(Message::SwitchMode(Mode::Index)))
             .push(
-                iced::pure::button("Utwórz zlecenie").on_press(Message::SwitchMode(
+                iced::pure::button("Utwórz zlecenie").on_press(Message::SwitchMode({
+                    let form = RepairContract::default();
                     Mode::CreateNewRepairContract {
-                        form: Default::default(),
-                    },
-                )),
+                        form: form.clone(),
+                        buffer: iced_forms::to_value(form),
+                    }
+                })),
             )
             .push(
                 iced::pure::button("zlecenia").on_press(Message::SwitchMode(Mode::ViewingEntries)),
@@ -192,8 +224,9 @@ impl Application for ArchiwumZ {
             Mode::ViewingEntries => {
                 pages::contracts_list(&self.repair_contract_entries_buffer).into()
             }
-            Mode::CreateNewRepairContract { form } => {
-                pages::create_new_contract_form(&self.repair_contract_entries_buffer, form).into()
+            Mode::CreateNewRepairContract { form, buffer } => {
+                pages::create_new_contract_form(&self.repair_contract_entries_buffer, form, buffer)
+                    .into()
             }
         };
 
