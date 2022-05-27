@@ -3,38 +3,21 @@ mod colors {
     pub static BLACK: Color = [0., 0., 0.];
     pub static WHITE: Color = [1., 1., 1.];
 }
-use std::{
-    path::PathBuf,
-    sync::Arc,
-};
+use std::{path::PathBuf, sync::Arc};
 
 use futures::FutureExt;
 use iced::{
     alignment,
     pure::{
-        widget::{
-            Button,
-            Column,
-            Container,
-            Row,
-            Scrollable,
-            Text,
-            TextInput,
-        },
-        Application,
-        Element,
+        widget::{Button, Column, Container, Row, Scrollable, Text, TextInput},
+        Application, Element,
     },
-    Alignment,
-    Command,
-    Length,
+    Alignment, Command, Length,
 };
 use iced_forms::IcedFormValueResult;
 use tracing::error;
 
-use crate::{
-    db::RepairContractEntry,
-    models::RepairContract,
-};
+use crate::{db::RepairContractEntry, models::RepairContract};
 
 use super::*;
 
@@ -85,10 +68,7 @@ mod custom_widgets {
 mod pages {
 
     use iced::pure::text;
-    use iced_forms::{
-        IcedForm,
-        IcedFormValueResult,
-    };
+    use iced_forms::{IcedForm, IcedFormValueResult};
 
     use crate::db::FillForm;
 
@@ -115,7 +95,9 @@ mod pages {
         let form: Element<'a, _> = match buffer {
             Ok(form) => form
                 .view(
-                    move |v| Message::CreateRepairContract(CreateRepairContract::FormUpdated(v)),
+                    Arc::new(move |v| {
+                        Message::CreateRepairContract(CreateRepairContract::FormUpdated(v))
+                    }),
                     Default::default(),
                 )
                 .into(),

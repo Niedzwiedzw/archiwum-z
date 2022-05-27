@@ -1,17 +1,7 @@
-use std::{
-    fmt::Display,
-    str::FromStr,
-};
+use std::{fmt::Display, str::FromStr, sync::Arc};
 
-use chrono::{
-    DateTime,
-    NaiveDateTime,
-    Utc,
-};
-use serde::{
-    de::DeserializeOwned,
-    Serialize,
-};
+use chrono::{DateTime, NaiveDateTime, Utc};
+use serde::{de::DeserializeOwned, Serialize};
 use thiserror::Error;
 
 #[derive(Error, Debug, Clone)]
@@ -127,10 +117,9 @@ pub struct UpdatedMessage {
 // impl_iced_form!(String);
 // impl_iced_form!(uuid::Uuid);
 
-use iced::pure::{
-    column,
-    container,
-    text_input,
+use iced::{
+    pure::{checkbox, column, container, text, text_input},
+    Length,
 };
 
 #[derive(Clone, Debug)]
@@ -205,7 +194,7 @@ where
 {
     fn view(
         &'a self,
-        on_change: impl Fn(IcedFormValueResult<serde_json::Value>) -> Message + 'a + Clone,
+        on_change: Arc<dyn Fn(IcedFormValueResult<serde_json::Value>) -> Message + 'a>,
         selector: Selector,
     ) -> iced::pure::widget::Container<'a, Message>;
 }
@@ -216,63 +205,83 @@ where
 {
     fn view(
         &'a self,
-        on_change: impl Fn(IcedFormValueResult<serde_json::Value>) -> Message + 'a + Clone,
+        on_change: Arc<dyn Fn(IcedFormValueResult<serde_json::Value>) -> Message + 'a>,
         selector: Selector,
     ) -> iced::pure::widget::Container<'a, Message> {
         match self {
-            serde_json::Value::Null => todo!(),
-            serde_json::Value::Bool(_) => todo!(),
-
-            serde_json::Value::Number(value) => container(text_input(
-                &format!("{selector}"),
-                &serde_json::to_string(&serde_json::Value::Number(value.clone()))
-                    .expect("failed to serialize a number?"),
-                move |value| {
-                    on_change(serde_json::from_str(&value).map_err(|e| {
-                        IcedFormValueError::Deserializing {
-                            type_name: "Number",
-                            message: e.to_string(),
-                        }
-                    }))
-                },
-            )),
-            serde_json::Value::String(value) => {
-                container(text_input(&format!("{selector}"), value, move |value| {
+            serde_json::Value::Null => container(text(&format!("{selector}"))),
+            serde_json::Value::Bool(value) => container(
+                checkbox(&format!("{selector}"), *value, move |value| {
+                    on_change(to_value(value))
+                })
+                .width(Length::Fill),
+            )
+            .width(Length::Fill)
+            .height(Length::Fill),
+            serde_json::Value::Number(value) => container(
+                text_input(
+                    &format!("{selector}"),
+                    &serde_json::to_string(&serde_json::Value::Number(value.clone()))
+                        .expect("failed to serialize a number?"),
+                    move |value| {
+                        on_change(serde_json::from_str(&value).map_err(|e| {
+                            IcedFormValueError::Deserializing {
+                                type_name: "Number",
+                                message: e.to_string(),
+                            }
+                        }))
+                    },
+                )
+                .width(Length::Fill),
+            )
+            .width(Length::Fill)
+            .height(Length::Fill),
+            serde_json::Value::String(value) => container(
+                text_input(&format!("{selector}"), value, move |value| {
                     on_change(Ok(serde_json::Value::String(value)))
-                }))
-            }
+                })
+                .width(Length::Fill),
+            )
+            .width(Length::Fill)
+            .height(Length::Fill),
             serde_json::Value::Array(values) => container(values.iter().enumerate().fold(
                 column(),
                 move |acc, (index, value)| {
                     let on_change = on_change.clone();
                     acc.push(value.view(
-                        move |value| match value {
+                        Arc::new(move |value| match value {
                             Ok(value) => {
                                 let mut new = values.clone();
                                 new.insert(index, value);
                                 on_change(Ok(serde_json::Value::Array(new)))
                             }
                             Err(e) => on_change(Err(e)),
-                        },
+                        }),
                         selector.push(SelectorSegment::ArrayIndex(index)),
                     ))
                 },
-            )),
+            ))
+            .padding(10)
+            .width(Length::Fill)
+            .height(Length::Fill),
             serde_json::Value::Object(values) => {
                 container(values.iter().fold(column(), move |acc, (key, value)| {
                     let on_change = on_change.clone();
                     acc.push(value.view(
-                        move |value| match value {
+                        Arc::new(move |value| match value {
                             Ok(value) => {
                                 let mut new = values.clone();
                                 new.insert(key.to_string(), value);
                                 on_change(Ok(serde_json::Value::Object(new)))
                             }
                             Err(e) => on_change(Err(e)),
-                        },
+                        }),
                         selector.push(SelectorSegment::ObjectField(key.to_string())),
                     ))
                 }))
+                .padding(10)
+                .width(Length::Fill)
+                .height(Length::Fill)
             }
         }
     }
