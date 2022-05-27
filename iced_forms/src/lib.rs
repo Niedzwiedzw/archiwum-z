@@ -65,29 +65,54 @@ impl IcedFormValue for uuid::Uuid {
     }
 }
 
-impl_iced_form!(NaiveDateTime);
-impl_iced_form!(String);
-impl_iced_form!(uuid::Uuid);
+// impl_iced_form!(NaiveDateTime);
+// impl_iced_form!(String);
+// impl_iced_form!(uuid::Uuid);
 
-pub trait IcedForm<'a>: Sized + Clone {
+pub trait IcedForm<'a, F, Parent>: Sized + Clone
+where
+    F: Fn(IcedFormValueResult<Self>) -> IcedFormValueResult<Parent>,
+    Parent: Clone,
+{
     fn view(
         &self,
         name: &'static str,
-        on_change: impl Fn(IcedFormValueResult<Self>) -> IcedFormValueResult<Self> + 'a,
+        on_change: F,
     ) -> iced::pure::widget::Container<'a, IcedFormValueResult<Self>>;
 }
 use iced::pure::{
     container,
     text_input,
 };
+
+impl<'a, F, Parent> IcedForm<'a, F, Parent> for uuid::Uuid
+where
+    F: Fn(IcedFormValueResult<Self>) -> IcedFormValueResult<Parent>,
+    Parent: Clone,
+{
+    fn view(
+        &self,
+        name: &'static str,
+        on_change: F,
+    ) -> iced::pure::widget::Container<'a, IcedFormValueResult<Self>> {
+        container::<'a>(text_input(name, &self.serialize(), move |val: String| {
+            on_change(<uuid::Uuid>::deserialize(&val))
+        }))
+    }
+}
+
 #[macro_export]
 macro_rules! impl_iced_form {
     ($ty:ty) => {
-        impl<'a> IcedForm<'a> for $ty {
+        impl<'a, F, ParentMessage> IcedForm<'a, F, ParentMessage> for $ty
+        where
+            F: Fn(IcedFormValueResult<Self>) -> ParentMessage,
+            ParentMessage: Clone,
+        {
             fn view(
                 &self,
                 name: &'static str,
-                on_change: impl Fn(IcedFormValueResult<Self>) -> IcedFormValueResult<Self> + 'a,
+                on_change: impl Fn(IcedFormValueResult<Self>) -> ParentMessage,
             ) -> iced::pure::widget::Container<'a, IcedFormValueResult<Self>> {
                 container::<'a>(text_input(name, &self.serialize(), move |val: String| {
                     on_change(<$ty>::deserialize(&val))

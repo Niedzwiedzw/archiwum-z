@@ -11,3 +11,5 @@ thiserror = "1"
 rust_decimal = { version = "1.23" }
 chrono = { version = "0.4" }
 uuid = { version = "1.0.0", features = ["v4"] }
+serde = "1.0.137"
+serde_json = { version = "1.0.81", features = ["preserve_order"] }
